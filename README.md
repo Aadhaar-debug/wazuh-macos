@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/app-icon.png" width="160" alt="Wazuh for macOS icon"></p>
+
 # Wazuh for macOS
 
 A native macOS app that runs the complete **Wazuh 4.14.10** SIEM/XDR platform on your Mac: the **Wazuh server (manager)**, the **Wazuh indexer**, and the **Wazuh dashboard**. You control everything from one window.
@@ -98,8 +100,8 @@ Requires the Xcode Command Line Tools (Swift 5.9+) on an Apple silicon Mac.
 ./scripts/make_dmg.sh    # -> dist/Wazuh-4.14.10-macOS-arm64.dmg
 ```
 
-The project is a Swift package (`Sources/WazuhMac`, SwiftUI + WebKit). The bundled stack lives in `Resources/stack` and is copied verbatim from `wazuh-docker/single-node` at `v4.14.10`.
+The project is a Swift package (`Sources/WazuhMac`, SwiftUI + WebKit). The app icon is drawn as vector geometry from `scripts/assets/logo.json`, which `scripts/fit_logo.swift` fits from `scripts/assets/logo-source.png` (straight-edge polygon plus circle, so the icon stays sharp at every size). `scripts/make_icon.swift` then renders it centered on a macOS icon tile. The bundled stack lives in `Resources/stack` and is copied verbatim from `wazuh-docker/single-node` at `v4.14.10`.
 
 ## License
 
-GPLv2. See [LICENSE](LICENSE). Wazuh © Wazuh, Inc.
+GPLv2. See [LICENSE](LICENSE). Wazuh © Wazuh, Inc. The Wazuh name and logo are trademarks of Wazuh, Inc., used here only to identify the software this app packages.

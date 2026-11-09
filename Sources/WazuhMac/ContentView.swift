@@ -86,10 +86,9 @@ struct OverviewView: View {
 
     var header: some View {
         HStack(alignment: .center, spacing: 16) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14).fill(wazuhBlue.gradient).frame(width: 60, height: 60)
-                Image(systemName: "shield.lefthalf.filled").font(.system(size: 28, weight: .semibold)).foregroundStyle(.white)
-            }
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable().interpolation(.high)
+                .frame(width: 72, height: 72)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Wazuh SIEM & XDR").font(.title.bold())
                 Text("Server, indexer and dashboard \(wazuhVersion) running locally on your Mac")

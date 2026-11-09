@@ -24,7 +24,7 @@ rm -rf "$APP/Contents/Resources/stack/config/wazuh_indexer_ssl_certs"
 
 # Icon
 ICONSET="$(mktemp -d)/AppIcon.iconset"; mkdir -p "$ICONSET"
-swift scripts/make_icon.swift "$ICONSET/icon_512x512@2x.png"
+swift scripts/make_icon.swift scripts/assets/logo.json "$ICONSET/icon_512x512@2x.png"
 for s in 16 32 128 256 512; do
   sips -z $s $s "$ICONSET/icon_512x512@2x.png" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
   d=$((s*2)); sips -z $d $d "$ICONSET/icon_512x512@2x.png" --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null

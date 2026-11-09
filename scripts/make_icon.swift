@@ -1,44 +1,73 @@
-// Renders the app icon (1024x1024 PNG). Usage: swift make_icon.swift out.png
+// Renders the 1024x1024 app icon from scripts/assets/logo.json (vector geometry fitted from
+// logo-source.png by fit_logo.swift): white macOS-style tile, logo centered.
+// Usage: swift make_icon.swift <logo.json> <out.png>
 import AppKit
 
+let a = CommandLine.arguments
+let spec = try! JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: a[1]))) as! [String: Any]
+let poly = (spec["w_polygon"] as! [[Double]]).map { CGPoint(x: $0[0], y: $0[1]) }
+let dotSpec = spec["dot"] as! [String: Any]
+let dot = (x: dotSpec["cx"] as! Double, y: dotSpec["cy"] as! Double, r: dotSpec["r"] as! Double)
+let source = (spec["source"] as! [String: Any])["width"] as! Double
+
+func color(_ hex: String) -> NSColor {
+    let v = Int(hex.dropFirst(), radix: 16)!
+    return NSColor(srgbRed: CGFloat((v >> 16) & 0xFF) / 255, green: CGFloat((v >> 8) & 0xFF) / 255,
+                   blue: CGFloat(v & 0xFF) / 255, alpha: 1)
+}
+
 let size: CGFloat = 1024
-let img = NSImage(size: NSSize(width: size, height: size))
-img.lockFocus()
-let ctx = NSGraphicsContext.current!.cgContext
+let tileInset: CGFloat = 100                       // Apple icon grid: 824pt tile on a 1024 canvas
+let tile = CGRect(x: tileInset, y: tileInset, width: size - 2 * tileInset, height: size - 2 * tileInset)
 
-// Rounded-square background with a blue gradient.
-let inset: CGFloat = 100
-let rect = CGRect(x: inset, y: inset, width: size - 2 * inset, height: size - 2 * inset)
-let bg = NSBezierPath(roundedRect: rect, xRadius: 185, yRadius: 185)
-ctx.saveGState()
-bg.addClip()
-let grad = NSGradient(colors: [NSColor(red: 0.16, green: 0.30, blue: 0.86, alpha: 1),
-                               NSColor(red: 0.30, green: 0.52, blue: 1.00, alpha: 1)])!
-grad.draw(in: rect, angle: 90)
-ctx.restoreGState()
+// Logo bounds (w polygon ∪ dot) in source pixels, y down.
+let minX = min(poly.map(\.x).min()!, dot.x - dot.r), maxX = max(poly.map(\.x).max()!, dot.x + dot.r)
+let minY = min(poly.map(\.y).min()!, dot.y - dot.r), maxY = max(poly.map(\.y).max()!, dot.y + dot.r)
+let center = CGPoint(x: (minX + maxX) / 2, y: (minY + maxY) / 2)
+let scale = tile.width / source                     // same logo-to-tile proportion as the source image
+func map(_ p: CGPoint) -> CGPoint {                 // source (y down) → icon (y up), logo centered on tile
+    CGPoint(x: tile.midX + (p.x - center.x) * scale, y: tile.midY - (p.y - center.y) * scale)
+}
 
-// Shield glyph.
-let cx = size / 2
-let top: CGFloat = 790, bottom: CGFloat = 220, half: CGFloat = 230
-let shield = NSBezierPath()
-shield.move(to: NSPoint(x: cx, y: top))
-shield.curve(to: NSPoint(x: cx + half, y: top - 70), controlPoint1: NSPoint(x: cx + 90, y: top - 45), controlPoint2: NSPoint(x: cx + 170, y: top - 60))
-shield.curve(to: NSPoint(x: cx, y: bottom), controlPoint1: NSPoint(x: cx + half, y: 450), controlPoint2: NSPoint(x: cx + 150, y: 300))
-shield.curve(to: NSPoint(x: cx - half, y: top - 70), controlPoint1: NSPoint(x: cx - 150, y: 300), controlPoint2: NSPoint(x: cx - half, y: 450))
-shield.curve(to: NSPoint(x: cx, y: top), controlPoint1: NSPoint(x: cx - 170, y: top - 60), controlPoint2: NSPoint(x: cx - 90, y: top - 45))
-shield.close()
+let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size), pixelsHigh: Int(size), bitsPerSample: 8,
+                           samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                           bytesPerRow: 0, bitsPerPixel: 0)!
+NSGraphicsContext.saveGraphicsState()
+NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+NSGraphicsContext.current!.shouldAntialias = true
+
+// Tile with a soft drop shadow, like system icons.
+let tilePath = NSBezierPath(roundedRect: tile, xRadius: 185, yRadius: 185)
+NSGraphicsContext.saveGraphicsState()
+let shadow = NSShadow()
+shadow.shadowColor = NSColor.black.withAlphaComponent(0.28)
+shadow.shadowOffset = NSSize(width: 0, height: -12)
+shadow.shadowBlurRadius = 24
+shadow.set()
 NSColor.white.setFill()
-shield.fill()
+tilePath.fill()
+NSGraphicsContext.restoreGraphicsState()
+NSColor.black.withAlphaComponent(0.08).setStroke()
+tilePath.lineWidth = 2
+tilePath.stroke()
 
-// "W" monogram inside the shield.
-let para = NSMutableParagraphStyle(); para.alignment = .center
-let attrs: [NSAttributedString.Key: Any] = [
-    .font: NSFont.systemFont(ofSize: 300, weight: .heavy),
-    .foregroundColor: NSColor(red: 0.18, green: 0.34, blue: 0.90, alpha: 1),
-    .paragraphStyle: para,
-]
-NSString(string: "W").draw(in: NSRect(x: 0, y: 330, width: size, height: 360), withAttributes: attrs)
-img.unlockFocus()
+// "w"
+let w = NSBezierPath()
+w.move(to: map(poly[0]))
+for p in poly.dropFirst() { w.line(to: map(p)) }
+w.close()
+color(spec["w_color"] as! String).setFill()
+w.fill()
 
-let rep = NSBitmapImageRep(data: img.tiffRepresentation!)!
-try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: CommandLine.arguments[1]))
+// Dot
+let c = map(CGPoint(x: dot.x, y: dot.y)), r = dot.r * scale
+color(dotSpec["color"] as! String).setFill()
+NSBezierPath(ovalIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)).fill()
+
+NSGraphicsContext.restoreGraphicsState()
+try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: a[2]))
+
+let lx = map(CGPoint(x: minX, y: 0)).x, rx = map(CGPoint(x: maxX, y: 0)).x
+let ty = map(CGPoint(x: 0, y: minY)).y, by = map(CGPoint(x: 0, y: maxY)).y
+print(String(format: "logo on tile: left margin %.1f, right %.1f, top %.1f, bottom %.1f",
+             lx - tile.minX, tile.maxX - rx, tile.maxY - ty, by - tile.minY))
