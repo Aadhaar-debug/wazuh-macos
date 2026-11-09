@@ -18,7 +18,7 @@ The Wazuh manager only runs on Linux, and it can't be compiled for macOS. So thi
 |---|---|
 | **Overview** | Start, stop, and restart the stack. Shows live container state and endpoint health for the manager, indexer, and dashboard. Shows access credentials. |
 | **Dashboard** | The full official Wazuh dashboard inside the app, with downloads, file uploads, and session persistence. |
-| **Deploy Agents** | Install commands for macOS, Linux (DEB/RPM), and Windows agents, pre-filled with this Mac's IP address. |
+| **Deploy Agents** | Install commands for macOS, Linux (DEB/RPM), and Windows agents. Also: the agent `ossec.conf` `<client>` block, a one-line command to re-point an installed agent, firewall and port rules for the server and endpoints, and a live connection check. |
 | **Logs** | Live logs for each container, plus the app's own activity log. |
 | **Settings** | Stack folder, ports, and a full data reset. |
 | **Menu bar** | Shield icon showing status, with quick start and stop. |
@@ -26,7 +26,7 @@ The Wazuh manager only runs on Linux, and it can't be compiled for macOS. So thi
 ## Install
 
 1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and give it at least **6 GB of memory** (8 GB recommended).
-2. Download `Wazuh-4.14.10-macOS-arm64.dmg` from [Releases](../../releases), open it, and drag **Wazuh** to Applications.
+2. Download the latest `Wazuh-*-macOS-arm64.dmg` from [Releases](../../releases), open it, and drag **Wazuh** to Applications.
 3. The app is ad-hoc signed, not notarized. On first launch, right-click it and choose **Open**, or run:
    ```bash
    xattr -dr com.apple.quarantine /Applications/Wazuh.app
@@ -43,6 +43,17 @@ The Wazuh manager only runs on Linux, and it can't be compiled for macOS. So thi
 | Indexer | https://localhost:9200 | `admin` | `SecretPassword` |
 
 Change these before exposing the stack to a network. Follow the [wazuh-docker password guide](https://documentation.wazuh.com/current/deployment-options/docker/wazuh-container.html#change-the-password-of-wazuh-users), editing the files in the stack folder.
+
+## Agent not showing up?
+
+Open **Deploy Agents → 5. Connection check**. The usual cause is an agent pointed at the wrong address, for example after DHCP changes this Mac's IP.
+- Agent on the same Mac as Wazuh: use `127.0.0.1` as the server address.
+- Other machines: use this Mac's Bonjour hostname (`<name>.local`), or reserve its IP on your router.
+- Re-point an installed macOS agent:
+  ```bash
+  sudo sed -i '' 's|<address>[^<]*</address>|<address>127.0.0.1</address>|' /Library/Ossec/etc/ossec.conf && sudo /Library/Ossec/bin/wazuh-control restart
+  ```
+- Agents need outbound TCP 1514 and 1515 to this Mac. If the macOS firewall is on, allow `/Applications/Docker.app/Contents/MacOS/com.docker.backend`.
 
 ## Ports
 
