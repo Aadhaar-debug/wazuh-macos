@@ -1,0 +1,5 @@
+.build/
+dist/
+.DS_Store
+Resources/stack/config/wazuh_indexer_ssl_certs/
+.swiftpm/
