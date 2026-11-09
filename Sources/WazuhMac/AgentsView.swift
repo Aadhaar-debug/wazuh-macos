@@ -20,6 +20,7 @@ struct AgentsView: View {
         var id: String { rawValue }
         var isMac: Bool { self == .macARM || self == .macIntel }
         var isLinux: Bool { !isMac && self != .windows }
+        var agentOS: AgentOS { isMac ? .macOS : (self == .windows ? .windows : .linux) }
     }
 
     // MARK: Commands
@@ -177,7 +178,15 @@ struct AgentsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             } header: { Text("4. Allow agent traffic") }
 
-            Section("5. Connection check") { ConnectionCheck() }
+            Section {
+                ScansSection(group: $group, os: platform.agentOS)
+            } header: { Text("5. Enable all scans") }
+
+            Section {
+                EndpointVerify(os: platform.agentOS)
+            } header: { Text("6. Verify on the endpoint (\(platform.agentOS.label))") }
+
+            Section("7. Connection & scan check: all agents") { AgentsCheck() }
         }
         .formStyle(.grouped)
         .navigationTitle("Deploy Agents")
@@ -254,104 +263,6 @@ struct FirewallStatus: View {
         }
     }
 }
-
-/// Live diagnostics: registered agents on the manager and agent connection attempts on this Mac.
-struct ConnectionCheck: View {
-    @EnvironmentObject var stack: StackManager
-    @State private var lines: [(ok: Bool?, text: String)] = []
-    @State private var agents = ""
-    @State private var running = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Button { Task { await run() } } label: { Label("Run check", systemImage: "stethoscope") }
-                    .disabled(running)
-                if running { ProgressView().controlSize(.small) }
-            }
-            ForEach(Array(lines.enumerated()), id: \.offset) { _, l in
-                HStack(alignment: .top) {
-                    Image(systemName: l.ok == nil ? "info.circle" : (l.ok! ? "checkmark.circle.fill" : "xmark.octagon.fill"))
-                        .foregroundStyle(l.ok == nil ? Color.secondary : (l.ok! ? Color.green : Color.red))
-                    Text(l.text).font(.callout).textSelection(.enabled)
-                }
-            }
-            if !agents.isEmpty {
-                Text(agents).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
-                    .padding(8).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-            }
-        }
-        .task { await run() }
-    }
-
-    func run() async {
-        running = true; defer { running = false }
-        var out: [(Bool?, String)] = []
-
-        // 1. Server ports: actually connect, like an agent would.
-        var open: [String] = [], closed: [String] = []
-        for port in ["1514", "1515"] {
-            let ok = await Shell.run("/usr/bin/nc", ["-z", "-G", "2", "127.0.0.1", port]).ok
-            if ok { open.append(port) } else { closed.append(port) }
-        }
-        out.append(closed.isEmpty
-            ? (true, "Server is accepting agent connections on 1514 and 1515.")
-            : (false, "Server is not accepting connections on \(closed.joined(separator: ", ")). Start Wazuh (or wait for the manager to finish starting)."))
-
-        // 2. Registered agents, as the manager sees them.
-        var registered: [(id: String, name: String, status: String)] = []
-        let docker = stack.dockerPath
-        let managerUp = stack.services.first(where: { $0.id == "wazuh.manager" })?.isRunning == true
-        if let docker, managerUp {
-            let r = await Shell.run(docker, ["exec", "wazuh-mac-wazuh.manager-1", "/var/ossec/bin/agent_control", "-l"])
-            for row in r.output.split(separator: "\n") where row.contains("ID:") && !row.contains("ID: 000") {
-                let parts = row.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                guard parts.count >= 4 else { continue }
-                registered.append((id: parts[0].replacingOccurrences(of: "ID: ", with: ""),
-                                   name: parts[1].replacingOccurrences(of: "Name: ", with: ""),
-                                   status: parts[3...].joined(separator: ", ")))
-            }
-        }
-
-        // 3. This Mac's own agent: find it on the manager by hostname.
-        if FileManager.default.fileExists(atPath: "/Library/Ossec") {
-            let agentProc = await Shell.run("/usr/bin/pgrep", ["-x", "wazuh-agentd"]).ok
-            out.append((agentProc, agentProc ? "Wazuh agent is installed and running on this Mac."
-                                             : "Wazuh agent is installed on this Mac but not running. Start it with section 2."))
-            if agentProc, let docker, managerUp {
-                let host = ProcessInfo.processInfo.hostName.lowercased()
-                let shortHost = host.components(separatedBy: ".").first ?? host
-                var match: (id: String, name: String, status: String)?
-                for a in registered.prefix(50) {
-                    let info = await Shell.run(docker, ["exec", "wazuh-mac-wazuh.manager-1", "/var/ossec/bin/agent_control", "-i", a.id]).output.lowercased()
-                    if info.contains(shortHost) { match = a; break }
-                }
-                if let m = match {
-                    if m.status.hasPrefix("Active") {
-                        out.append((true, "This Mac's agent is connected as “\(m.name)” (ID \(m.id))."))
-                    } else {
-                        out.append((false, "This Mac's agent is enrolled as “\(m.name)” but is \(m.status). Re-point it to 127.0.0.1 with the command in section 3."))
-                    }
-                } else {
-                    out.append((false, "This Mac's agent is not connected to this server. It is probably pointed at another address; re-point it to 127.0.0.1 with the command in section 3, then run the check again."))
-                }
-            }
-        } else {
-            out.append((nil, "No Wazuh agent installed on this Mac."))
-        }
-
-        if managerUp {
-            out.append((registered.isEmpty ? false : true,
-                        registered.isEmpty ? "No agents have enrolled with the server yet." : "\(registered.count) agent(s) registered with the server:"))
-            agents = registered.map { "ID \($0.id)  \($0.name)  —  \($0.status)" }.joined(separator: "\n")
-        } else {
-            agents = ""
-        }
-        lines = out.map { (ok: $0.0, text: $0.1) }
-    }
-}
-
 
 struct CommandBox: View {
     let text: String

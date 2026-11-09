@@ -18,7 +18,7 @@ The Wazuh manager only runs on Linux, and it can't be compiled for macOS. So thi
 |---|---|
 | **Overview** | Start, stop, and restart the stack. Shows live container state and endpoint health for the manager, indexer, and dashboard. Shows access credentials. |
 | **Dashboard** | The full official Wazuh dashboard inside the app, with downloads, file uploads, and session persistence. |
-| **Deploy Agents** | Install commands for macOS, Linux (DEB/RPM), and Windows agents. Also: the agent `ossec.conf` `<client>` block, a one-line command to re-point an installed agent, firewall and port rules for the server and endpoints, and a live connection check. |
+| **Deploy Agents** | Install commands for macOS, Linux (DEB/RPM), and Windows agents. Also: the agent `ossec.conf` `<client>` block, a one-line command to re-point an installed agent, firewall and port rules for the server and endpoints, **one-click "enable all scans"** for every agent, endpoint verification commands for each OS, and a connection and scan check covering every agent. |
 | **Logs** | Live logs for each container, plus the app's own activity log. |
 | **Settings** | Stack folder, ports, and a full data reset. |
 | **Menu bar** | Shield icon showing status, with quick start and stop. |
@@ -43,6 +43,27 @@ The Wazuh manager only runs on Linux, and it can't be compiled for macOS. So thi
 | Indexer | https://localhost:9200 | `admin` | `SecretPassword` |
 
 Change these before exposing the stack to a network. Follow the [wazuh-docker password guide](https://documentation.wazuh.com/current/deployment-options/docker/wazuh-container.html#change-the-password-of-wazuh-users), editing the files in the stack folder.
+
+## Enable all scans
+
+**Deploy Agents → 5. Enable all scans** pushes one centralized `agent.conf` to an agent group (default: `default`). It has separate `<agent_config os="Darwin|Linux|Windows">` blocks, so every agent in the group gets the right settings for its OS and restarts itself within about a minute. Wazuh's `verify-agent-conf` validates the file before it's installed, and the previous version is backed up.
+
+| Capability | macOS | Linux | Windows |
+|---|---|---|---|
+| File integrity monitoring | scheduled every 30 min: system binaries, `/private/etc`, LaunchAgents/Daemons, Applications, Downloads | real-time: `/etc`, binaries, `/boot`, cron, `.ssh` | real-time: hosts file, Tasks, Startup folders, Downloads, Program Files |
+| Registry monitoring | — | — | Run/RunOnce, Policies, Winlogon, Services, Security |
+| Rootkit & malware (rootcheck) | ✔ | ✔ | ✔ |
+| CIS configuration assessment (SCA) | ✔ (adapted CIS macOS 15 benchmark for macOS 15 and later) | ✔ | ✔ |
+| Inventory: hardware, OS, network, packages, ports, processes, users, groups, services, browser extensions | ✔ | ✔ | ✔ (+ hotfixes) |
+| Vulnerability detection (server side, from inventory) | ✔ | ✔ | ✔ |
+| Security logs | unified log (agent default), install.log | journald, auditd, auth/secure, dpkg | Sysmon, Defender, PowerShell, Task Scheduler, Firewall, System, Application |
+| osquery / Docker events (optional) | osquery | osquery, Docker | osquery |
+
+Prefer configuring a single endpoint? The same section gives a copy-paste command for each OS that appends the block to that agent's `ossec.conf` and restarts it.
+
+**7. Connection & scan check** lists every registered agent with its OS, version, group, config sync state and last keep-alive, plus advice for Disconnected or Never-connected agents. Expand an agent to see evidence that each scan type has actually run.
+
+![Agent scan status](docs/screenshot-agent-scans.png)
 
 ## Agent not showing up?
 

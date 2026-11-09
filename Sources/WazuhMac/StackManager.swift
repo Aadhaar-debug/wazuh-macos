@@ -67,7 +67,7 @@ final class StackManager: ObservableObject {
         }
     }
 
-    private func append(_ line: String) {
+    func append(_ line: String) {
         log.append(line)
         if log.count > 4000 { log.removeFirst(log.count - 4000) }
     }
@@ -157,7 +157,7 @@ final class StackManager: ObservableObject {
     private func compose(_ args: [String], file: String = "docker-compose.yml") async -> Bool {
         guard let docker = dockerPath else { return false }
         append("$ docker compose \(args.joined(separator: " "))")
-        let r = await Shell.run(docker, ["compose", "-p", composeProject, "-f", file] + args, cwd: stackDir) { line in
+        let r = await Shell.run(docker, ["compose", "-p", composeProject, "-f", file] + args, cwd: stackDir, timeout: nil) { line in
             Task { @MainActor in self.append(line) }
         }
         if !r.ok { append("✖ exited with status \(r.status)") }

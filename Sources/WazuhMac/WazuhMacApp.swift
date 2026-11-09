@@ -2,7 +2,12 @@ import SwiftUI
 import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var activity: NSObjectProtocol?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Keep status polling and agent checks running while the window is in the background (no App Nap).
+        activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiatedAllowingIdleSystemSleep],
+                                                         reason: "Monitoring the local Wazuh stack")
         // Built as a plain SwiftPM executable: make sure it behaves like a regular Dock app.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
