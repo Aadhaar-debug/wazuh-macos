@@ -13,6 +13,7 @@ struct AgentInfo: Identifiable {
     var group = ""
     var synced: Bool?
     var fimLastScan = ""
+    var hostname = ""
 
     var osFamily: AgentOS? {
         let o = os.lowercased()
@@ -126,6 +127,13 @@ extension StackManager {
         return r.ok ? (true, "macOS CIS policy installed.") : (false, r.output)
     }
 
+    func removeAgent(id: String) async -> Bool {
+        guard id.range(of: "^[0-9]+$", options: .regularExpression) != nil else { return false }
+        let r = await exec(["/var/ossec/bin/manage_agents", "-r", id])
+        append("Removed agent \(id) from the server")
+        return r.ok
+    }
+
     func agents() async -> [AgentInfo] {
         guard managerRunning else { return [] }
         let list = await exec(["/var/ossec/bin/agent_control", "-l"]).output
@@ -145,7 +153,10 @@ extension StackManager {
                 let kv = line.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
                 guard kv.count == 2 else { continue }
                 switch kv[0] {
-                case "Operating system": result[i].os = (kv[1].split(separator: "|").first.map(String.init) ?? kv[1]).trimmingCharacters(in: .whitespaces)
+                case "Operating system":
+                    let f = kv[1].split(separator: "|").map { $0.trimmingCharacters(in: .whitespaces) }
+                    result[i].os = f.first ?? kv[1]
+                    if f.count > 1 { result[i].hostname = f[1] }
                 case "Client version": result[i].version = kv[1]
                 case "Syscheck last ended at": result[i].fimLastScan = kv[1]
                 case "Last keep alive": if let t = TimeInterval(kv[1]), t > 0 { result[i].lastKeepAlive = Date(timeIntervalSince1970: t) }

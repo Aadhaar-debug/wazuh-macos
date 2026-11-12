@@ -46,9 +46,20 @@ The Wazuh manager only runs on Linux, and it can't be compiled for macOS. So thi
 
 Change these before exposing the stack to a network. Follow the [wazuh-docker password guide](https://documentation.wazuh.com/current/deployment-options/docker/wazuh-container.html#change-the-password-of-wazuh-users), editing the files in the stack folder.
 
+## Setting up an agent
+
+**Deploy Agents** is a guided, numbered flow. Choose *This Mac* or *Another computer* (macOS, Debian/Ubuntu, RHEL-family Linux or Windows). Each **Copy** button copies one complete, single-line command, safe to paste into zsh, bash or PowerShell, and every step can be re-run. On this Mac, each step also has **Run on this Mac**, which uses the standard macOS administrator prompt.
+
+1. Turn on all scans on the server (once per group).
+2. Remove any previous agent: an uninstall command, plus removal of the old registration on the server.
+3. Download and install the agent. The processor type is detected automatically; Linux uses apt/dnf so dependencies are installed.
+4. Allow the server's scan policies (`sca.remote_commands=1`).
+5. Start the agent and connect. The page watches live until it's connected.
+6. Check that every scan is running.
+
 ## Enable all scans
 
-**Deploy Agents → 5. Enable all scans** pushes one centralized `agent.conf` to an agent group (default: `default`). It has separate `<agent_config os="Darwin|Linux|Windows">` blocks, so every agent in the group gets the right settings for its OS and restarts itself within about a minute. Wazuh's `verify-agent-conf` validates the file before it's installed, and the previous version is backed up.
+**Deploy Agents → step 1, Turn on all scans on the server** pushes one centralized `agent.conf` to an agent group (default: `default`). It has separate `<agent_config os="Darwin|Linux|Windows">` blocks, so every agent in the group gets the right settings for its OS and restarts itself within about a minute. Wazuh's `verify-agent-conf` validates the file before it's installed, and the previous version is backed up.
 
 | Capability | macOS | Linux | Windows |
 |---|---|---|---|
@@ -61,15 +72,15 @@ Change these before exposing the stack to a network. Follow the [wazuh-docker pa
 | Security logs | unified log (agent default), install.log | journald, auditd, auth/secure, dpkg | Sysmon, Defender, PowerShell, Task Scheduler, Firewall, System, Application |
 | osquery / Docker events (optional) | osquery | osquery, Docker | osquery |
 
-Prefer configuring a single endpoint? The same section gives a copy-paste command for each OS that appends the block to that agent's `ossec.conf` and restarts it.
+Prefer configuring a single endpoint? **Troubleshooting → Configure scans on one agent** gives a one-line command for each OS that writes the block into that agent's `ossec.conf` (replacing any earlier copy) and restarts it.
 
-**7. Connection & scan check** lists every registered agent with its OS, version, group, config sync state and last keep-alive, plus advice for Disconnected or Never-connected agents. Expand an agent to see evidence that each scan type has actually run.
+**Step 6, Check that every scan is running** lists every registered agent with its OS, version, group, config sync state and last keep-alive, plus advice for Disconnected or Never-connected agents. Expand an agent to see evidence that each scan type has actually run.
 
 ![Agent scan status](docs/screenshot-agent-scans.png)
 
 ## Agent not showing up?
 
-Open **Deploy Agents → 5. Connection check**. The usual cause is an agent pointed at the wrong address, for example after DHCP changes this Mac's IP.
+Open **Deploy Agents** and follow the steps: step 2 cleanly removes any old agent and its old registration on the server (a reinstall under the same name is otherwise refused as a "Duplicate agent name"), and step 6 shows the connection and scan status of every agent. **Troubleshooting** at the bottom has commands for each common problem. The usual cause is an agent pointed at the wrong address, for example after DHCP changes this Mac's IP.
 - Agent on the same Mac as Wazuh: use `127.0.0.1` as the server address.
 - Other machines: use this Mac's Bonjour hostname (`<name>.local`), or reserve its IP on your router.
 - Re-point an installed macOS agent:

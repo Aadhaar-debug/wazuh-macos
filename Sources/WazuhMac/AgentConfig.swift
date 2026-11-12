@@ -33,8 +33,10 @@ enum AgentConfig {
     }
 
     /// Block to append to one agent's local ossec.conf.
+    static let localBegin = "<!-- WAZUHMAC-SCANS BEGIN -->"
+    static let localEnd = "<!-- WAZUHMAC-SCANS END -->"
     static func localConf(_ os: AgentOS, _ o: ScanOptions) -> String {
-        "<!-- Wazuh for macOS: enable all scans -->\n<ossec_config>\n\(block(os, o).indented(2))</ossec_config>\n"
+        "\(localBegin)\n<ossec_config>\n\(block(os, o).indented(2))</ossec_config>\n\(localEnd)\n"
     }
 
     /// Adapted CIS macOS benchmark distributed through the group's shared folder (see AgentServer).
